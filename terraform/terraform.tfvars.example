@@ -1,1 +1,2 @@
 do_token = "123456"
+ssh_key_file = "~/.ssh/somekey"
