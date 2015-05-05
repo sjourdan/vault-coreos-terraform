@@ -1,44 +1,111 @@
+# Vault on CoreOS + Docker with Terraform (on Digital Ocean)
 
+This will deploy [Vault](https://vaultproject.io) on [CoreOS](http://coreos.com/) using [my Vault Docker container](https://registry.hub.docker.com/u/sjourdan/vault/) with [Terraform](http://terraform.io/).
 
-$ fleetctl list-machines
+A first version of this will use [demo.consul.io](https://demo.consul.io) as a backend, but using [docker-vault](https://github.com/sjourdan/docker-vault) it can easily be extended to a private [Consul](https://consul.io/) backend.
 
-cat hello.service
+Terraform will start/manage the CoreOS infrastructure, cloud-init will give enough information to start/join the cluster. Then CoreOS will start the containers.
 
+## Deploy the base infrastructure
 
-[Unit]
-Description=My Service
-After=docker.service
+    $ terraform apply
 
-[Service]
-TimeoutStartSec=0
-ExecStartPre=-/usr/bin/docker kill hello
-ExecStartPre=-/usr/bin/docker rm hello
-ExecStartPre=/usr/bin/docker pull busybox
-ExecStart=/usr/bin/docker run --name hello busybox /bin/sh -c "while true; do echo Hello World; sleep 1; done"
-ExecStop=/usr/bin/docker stop hello
+## CoreOS
 
-fleetctl submit hello.service
+Login and check `fleetctl` sees all the cluster machines:
 
-fleetctl list-units
-fleetctl list-unit-files
+    fleetctl list-machines
+    MACHINE         IP              METADATA
+    6147c03d...     10.133.169.81   -
+    [...]
 
-fleetctl cat hello.service
+Units are empty:
 
-$ fleetctl load hello.service
-Unit hello.service loaded on 6147c03d.../10.133.169.81
+    fleetctl list-units
+    UNIT    MACHINE ACTIVE  SUB
 
-$ fleetctl list-unit-files
-UNIT            HASH    DSTATE  STATE   TARGET
-hello.service   0d1c468 loaded  loaded  6147c03d.../10.133.169.81
+The unit files are empty:
 
-$ fleetctl start hello.service
-Unit hello.service launched on 6147c03d.../10.133.169.81
+    fleetctl list-unit-files
+    UNIT            HASH    DSTATE  STATE   TARGET
 
-fleetctl status vault.service
+### Vault Service (Unit) Files
 
-$ fleetctl journal -f vault.service
-$ fleetctl journal -lines=100 -f vault@8200.service
--- Logs begin at Tue 2015-05-05 17:13:23 UTC, end at Tue 2015-05-05 17:19:14 UTC. --
-$ fleetctl ssh vault@8200 cat /etc/environment
+Submit the service files:
 
-$ docker exec -t -i d0070bbe8c63 /bin/sh
+    fleetctl submit vault\@.service vault-discovery\@.service
+
+Now we have unit files:
+
+    fleetctl list-unit-files
+    UNIT                            HASH    DSTATE          STATE           TARGET
+    vault-discovery@.service        d15726b inactive        inactive        -
+    vault@.service                  de5c96e inactive        inactive        -
+
+We want to start a Vault service on TCP/8200:
+
+    fleetctl load vault@8200.service
+    Unit vault@8200.service loaded on 6147c03d.../10.133.169.81
+
+    fleetctl load vault-discovery@8200.service
+    Unit vault-discovery@8200.service loaded on 6147c03d.../10.133.169.81
+
+### Start the Vault Service
+
+    fleetctl start vault@8200.service
+    Unit vault@8200.service launched on 6147c03d.../10.133.169.81
+
+Check the status:
+
+<pre>
+fleetctl status vault@8200.service
+● vault@8200.service - Vault Service
+   Loaded: loaded (/run/fleet/units/vault@8200.service; linked-runtime; vendor preset: disabled)
+   Active: active (running) since Tue 2015-05-05 21:04:15 UTC; 2s ago
+May 05 21:04:15 core-1 docker[1628]: fdaa9c66787e: Download complete
+May 05 21:04:15 core-1 docker[1628]: fdaa9c66787e: Download complete
+May 05 21:04:15 core-1 docker[1628]: Status: Image is up to date for sjourdan/vault:latest
+May 05 21:04:15 core-1 systemd[1]: Started Vault Service.
+May 05 21:04:15 core-1 docker[1637]: ==> Vault server configuration:
+May 05 21:04:15 core-1 docker[1637]: Log Level: info
+May 05 21:04:15 core-1 docker[1637]: Mlock: supported: true, enabled: true
+May 05 21:04:15 core-1 docker[1637]: Backend: consul (HA available)
+May 05 21:04:15 core-1 docker[1637]: Listener 1: tcp (addr: "0.0.0.0:8200", tls: "disabled")
+May 05 21:04:15 core-1 docker[1637]: ==> Vault server started! Log data will stream in below:
+</pre>
+
+Get from etcd the public IP and port to use:
+
+    etcdctl get /announce/services/vault8200
+    188.166.87.74:8200
+
+### Use the Vault Service
+
+On your workstation you can now use Vault:
+
+    export VAULT_ADDR='http://188.166.87.74:8200'
+    vault init
+    vault --help
+
+### Vault Container Logs
+
+Tail the 100 last line of container's logs:
+
+    fleetctl journal -lines=100 -f vault@8200.service
+    -- Logs begin at Tue 2015-05-05 17:13:23 UTC, end at Tue 2015-05-05 17:19:14 UTC. --
+    [...]
+
+If needed, attach a terminal to debug:
+
+    docker exec -t -i <CID> /bin/sh
+
+### Stop the service
+
+    fleetctl stop vault@8200.service
+
+### Destroy the Service Unit files
+
+If needed:
+
+    fleetctl destroy vault@8200.service
+    fleetctl destroy vault@.service
