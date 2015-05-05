@@ -11,7 +11,7 @@ EnvironmentFile=/etc/environment
 ExecStartPre=-/usr/bin/docker kill vault%i
 ExecStartPre=-/usr/bin/docker rm vault%i
 ExecStartPre=/usr/bin/docker pull sjourdan/vault
-ExecStart=/usr/bin/docker run --cap-add IPC_LOCK --hostname vault%i --name vault -p ${COREOS_PUBLIC_IPV4}:%i:8200 sjourdan/vault
+ExecStart=/usr/bin/docker run --cap-add IPC_LOCK --hostname vault%i --name vault%i -p ${COREOS_PUBLIC_IPV4}:%i:8200 sjourdan/vault
 ExecStop=/usr/bin/docker stop vault
 
 [X-Fleet]
