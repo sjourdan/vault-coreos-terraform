@@ -6,8 +6,13 @@ A first version of this will use [demo.consul.io](https://demo.consul.io) as a b
 
 Terraform will start/manage the CoreOS infrastructure, cloud-init will give enough information to start/join the cluster. Then CoreOS will start the containers.
 
+You **will** need to generate a [new etcd discover token](https://discovery.etcd.io/new) and enter it in the `terraform.tf` file for the demo to work.
+
 ## Deploy the base infrastructure
 
+Fill in the blanks in the configuration file:
+
+    $ cp terraform.tfvars.example terraform.tfvars
     $ terraform apply
 
 ## CoreOS
@@ -31,6 +36,8 @@ The unit files are empty:
 
 ### Vault Service (Unit) Files
 
+Transfer the files from this repo under `services/`.
+
 Submit the service files:
 
     fleetctl submit vault\@.service vault-discovery\@.service
@@ -51,6 +58,8 @@ We want to start a Vault service on TCP/8200:
     Unit vault-discovery@8200.service loaded on 6147c03d.../10.133.169.81
 
 ### Start the Vault Service
+
+Transfer the Vault configuration file from `config/` over to `/home/core/config`
 
     fleetctl start vault@8200.service
     Unit vault@8200.service launched on 6147c03d.../10.133.169.81
@@ -109,3 +118,7 @@ If needed:
 
     fleetctl destroy vault@8200.service
     fleetctl destroy vault@.service
+
+### Destroy the demo infrastructure.
+
+    terraform destroy
