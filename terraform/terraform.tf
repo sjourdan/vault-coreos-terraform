@@ -20,11 +20,13 @@ resource "digitalocean_droplet" "coreos-1" {
     user_data = <<EOF
 #cloud-config
 coreos:
-  etcd:
-    # generate a new token for each cluster from https://discovery.etcd.io/new
-    discovery: https://discovery.etcd.io/c1750e36ea1804f21877cb53c9d66bad
-    addr: $private_ipv4:4001
-    peer-addr: $private_ipv4:7001
+  etcd2:
+    # generate a new token for each cluster: https://discovery.etcd.io/new
+    discovery: https://discovery.etcd.io/1cebf45fc192bd4013bf4b4e7634097f
+    # multi-region and multi-cloud deployments need to use $public_ipv4
+    advertise-client-urls: http://$public_ipv4:2379
+    listen-client-urls: http://0.0.0.0:2379
+    listen-peer-urls: http://$private_ipv4:2380
   fleet:
     public-ip: $private_ipv4
   units:
