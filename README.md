@@ -4,9 +4,14 @@ This will deploy [Vault](https://vaultproject.io) on [CoreOS](http://coreos.com/
 
 A first version of this will use [demo.consul.io](https://demo.consul.io) as a backend, but using [docker-vault](https://github.com/sjourdan/docker-vault) it can easily be extended to a private [Consul](https://consul.io/) backend.
 
-Terraform will start/manage the CoreOS infrastructure, cloud-init will give enough information to start/join the cluster. Then CoreOS will start the containers.
+Terraform will start/manage the CoreOS infrastructure, cloud-init will give enough information to start/join the cluster and deploy required files. Then fleet will manage the containers.
 
-You **will** need to generate a [new etcd discover token](https://discovery.etcd.io/new) and enter it in the `terraform.tf` file for the demo to work.
+You **will** need to generate a [new etcd discovery token](https://discovery.etcd.io/new) and enter it in the `terraform.tf` file for the demo to work.
+
+The file `cloud-config.yml` contains:
+* The Vault configuration file (`/home/core/config/demo.hcl`)
+* The two `fleet` unit service files (`/home/core/services/vault@.service` and `/home/core/services/vault-discovery@.service`)
+* enough to start `etcd` and `fleet`
 
 ## Deploy the base infrastructure
 
@@ -36,11 +41,9 @@ The unit files are empty:
 
 ### Vault Service (Unit) Files
 
-Transfer the files from this repo under `services/`.
+Submit the service files sent by cloud-config under `services/`:
 
-Submit the service files:
-
-    fleetctl submit vault\@.service vault-discovery\@.service
+    fleetctl submit services/vault\@.service services/vault-discovery\@.service
 
 Now we have unit files:
 
@@ -122,3 +125,16 @@ If needed:
 ### Destroy the demo infrastructure.
 
     terraform destroy
+
+## Debug
+
+To get the etcd discovery address:
+
+    grep DISCOVERY /run/systemd/system/etcd.service.d/20-cloudinit.conf
+
+To try to validate the cloud-config.yml: [validator](https://coreos.com/validate/)
+
+To apply a new cloudinit:
+
+    sudo /usr/bin/coreos-cloudinit --oem=digitalocean
+    sudo /usr/bin/coreos-cloudinit --from-file conf.yml
