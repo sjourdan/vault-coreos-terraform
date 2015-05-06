@@ -11,7 +11,7 @@ resource "digitalocean_ssh_key" "default" {
 
 # Create a new vault droplet
 resource "digitalocean_droplet" "coreos-1" {
-    image = "coreos-stable"
+    image = "coreos-beta"
     name = "core-1"
     region = "ams3"
     size = "512mb"
