@@ -1,0 +1,62 @@
+#cloud-config
+write_files:
+  - path: /home/core/config/demo.hcl
+    content: |
+      backend "consul" {
+        address = "demo.consul.io:80"
+        path = "demo_vault_changeme"
+        advertise_addr = "http://127.0.0.1"
+      }
+
+      listener "tcp" {
+       address = "0.0.0.0:8200"
+       tls_disable = 1
+      }
+  - path: /home/core/services/vault@.service
+    content: |
+      [Unit]
+      Description=Vault Service
+      After=etcd.service
+      After=docker.service
+      Requires=vault-discovery@%i.service
+
+      [Service]
+      TimeoutStartSec=0
+      KillMode=none
+      EnvironmentFile=/etc/environment
+      ExecStartPre=-/usr/bin/docker kill vault%i
+      ExecStartPre=-/usr/bin/docker rm vault%i
+      ExecStartPre=/usr/bin/docker pull sjourdan/vault
+      ExecStart=/usr/bin/docker run --cap-add IPC_LOCK --hostname vault%i --name vault%i --volume /home/core/config:/config  -p ${COREOS_PUBLIC_IPV4}:%i:8200 sjourdan/vault -config=/config/demo.hcl
+      ExecStop=/usr/bin/docker stop vault
+
+      [X-Fleet]
+      X-Conflicts=vault@*.service
+  - path: /home/core/services/vault-discovery@.service
+    content: |
+      [Unit]
+      Description=Announce Vault@%i service
+      BindsTo=vault@%i.service
+
+      [Service]
+      EnvironmentFile=/etc/environment
+      ExecStart=/bin/sh -c "while true; do etcdctl set /announce/services/vault%i ${COREOS_PUBLIC_IPV4}:%i --ttl 60; sleep 45; done"
+      ExecStop=/usr/bin/etcdctl rm /announce/services/vault%i
+
+      [X-Fleet]
+      X-ConditionMachineOf=vault@%i.service
+coreos:
+  etcd:
+    # generate a new token for each cluster: https://discovery.etcd.io/new
+    discovery: https://discovery.etcd.io/fcc9c66458df3576daedffa38f0855f1
+    # multi-region and multi-cloud deployments need to use $public_ipv4
+    advertise-client-urls: http://$private_ipv4:2379
+    listen-client-urls: http://0.0.0.0:2379
+    listen-peer-urls: http://$private_ipv4:2380
+  fleet:
+    public-ip: $private_ipv4
+  units:
+    - name: etcd.service
+      command: start
+    - name: fleet.service
+      command: start
