@@ -28,7 +28,7 @@ write_files:
       ExecStartPre=-/usr/bin/docker rm vault%i
       ExecStartPre=/usr/bin/docker pull sjourdan/vault
       ExecStart=/usr/bin/docker run --cap-add IPC_LOCK --hostname vault%i --name vault%i --volume /home/core/config:/config  -p ${COREOS_PUBLIC_IPV4}:%i:8200 sjourdan/vault -config=/config/demo.hcl
-      ExecStop=/usr/bin/docker stop vault
+      ExecStop=/usr/bin/docker stop vault%i
 
       [X-Fleet]
       X-Conflicts=vault@*.service
@@ -40,7 +40,7 @@ write_files:
 
       [Service]
       EnvironmentFile=/etc/environment
-      ExecStart=/bin/sh -c "while true; do etcdctl set /announce/services/vault%i ${COREOS_PUBLIC_IPV4}:%i --ttl 60; sleep 45; done"
+      ExecStart=/bin/sh -c "while true; do /usr/bin/etcdctl set /announce/services/vault%i ${COREOS_PUBLIC_IPV4}:%i --ttl 60; sleep 45; done"
       ExecStop=/usr/bin/etcdctl rm /announce/services/vault%i
 
       [X-Fleet]
